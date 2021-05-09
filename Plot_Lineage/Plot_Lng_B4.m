@@ -1,0 +1,659 @@
+function Plot_Lng_B4
+%  Here we Plot the whole genalogy tree for a single lineage
+%
+%  SEGMENTATION
+%
+%
+%--------------------------------------------------------------------------
+% cN_End_Line and cS_End_Line allow us to to decide in which order to plot
+% the clones plotting order. Starting with the end-of-line cells
+% (cN_End_Line ) we plot every coupled daughter cells and then find the
+% update the list with the common ancestor. Doing this and progressing
+% "back in time" we complete the lineage tree by exclusion, untill only the
+% founder cell is 
+% Those two list will keep changing as we procede in the tree. We also  keep  
+% using ID_Raw_array as its c_ID have same index as in clone_List, making 
+% search more easy.
+%--------------------------------------------------------------------------
+%
+
+% OLD_pole = Mask_PL_1
+% NEW_pole = Mask_PL_2
+  
+%%
+% ----- INITIALIZE --------------------------------------------------------
+% Gather plotting parameters, the distribution of signal values and create
+% a corresponding RGB colormap
+
+global APP_opt ;
+
+hg_pl = APP_opt.t3_height_PlotLine ;         % heights of the plot end lines
+Dst_pl = APP_opt.t3_Dist_btw_PlotLines ;     % distances between plot end lines 
+LinW =  APP_opt.t3_BorderLineWidth ;         % LineWidth of line connecting ancestor-to-daughters
+Color_BorderLines = [.3 .3 .3]; 
+LAST_Frm = 1;                                % highest value frame, use to find max x-axis length
+fpmRate = 1 / APP_opt.t3_fpm_CH1 ;
+
+% Load the clone_List
+load([APP_opt.t3_path_cloneList, APP_opt.t3_file_cloneList]);   
+
+
+% Consider option APP_opt.t3_choose_ChannelMode, what channel(s) we wish to
+% plot: we can plot either individual channels, both in same plot or a
+% ratio of the two.
+% Each clone can be representated by one line containing the information
+% for a single channel or a ratio of the two; or a clone can be
+% representated by a line divided in two to plot the information for both
+% independent channels.
+% For this reason we use two variables to help discriminate all the cases:
+% - ChNum   : carries the channel(s) we need to create the plot
+% - SubLine : carries the number of "lines" to plot for each clone
+
+if APP_opt.t3_choose_ChannelMode == 1
+    ChNum = 1;
+    SubLine = 1 ;
+    LUT(1) = APP_opt.t3_ColorMap_LUT_CH1 ;
+    vRange{1} = APP_opt.t3_Value_Range_CH1 ;
+    
+elseif APP_opt.t3_choose_ChannelMode == 2
+    ChNum = 2 ;
+    SubLine = 1 ;
+    LUT(1) = APP_opt.t3_ColorMap_LUT_CH2 ;
+    vRange{1} = APP_opt.t3_Value_Range_CH2 ;
+    
+elseif APP_opt.t3_choose_ChannelMode == 3
+    % There cannot be two channels at the same time
+    
+elseif APP_opt.t3_choose_ChannelMode == 4
+    ChNum = [1, 2] ;
+    SubLine = 1 ;
+    LUT(1) = APP_opt.t3_ColorMap_LUT_CH1 ;
+    vRange{1} = APP_opt.t3_Value_Range_CH1;
+    
+elseif APP_opt.t3_choose_ChannelMode == 5
+    ChNum = [1, 2] ;
+    SubLine = 1 ;
+    LUT(1) = APP_opt.t3_ColorMap_LUT_CH1 ;
+    vRange{1} = APP_opt.t3_Value_Range_CH1;
+    
+end
+
+% Gather the distribution of all values (for each channel) needed to plot. 
+% Note if APP_opt.t3_choose_ChannelMode >= 4, Hist_Values_cloneList
+% return the ratio between the two channels.
+for kk = ChNum
+    [ Mu, Sigma, Distr_Vals ] = Hist_Values_cloneList(0, clone_List);
+end
+% For each channel create an RGB colormap, with corresponding range of
+% values associated to each color.
+for kk = SubLine
+    % Load the color LUT. For ratios, we select LUT of channel 1.
+    % [LUT folder should be in same folder of the scripts Plot_Lineage]
+    pathParts_LUT = strsplit(mfilename('fullpath'), {'/','\'} ) ;        % mfilename = take path of currently running script.
+    path_LUT = fullfile(pathParts_LUT{1,1:end-1},'\') ;                  % fullfile  = build full filename from string parts
+    filename_LUT = [path_LUT '/LUT/' 'LUT_' LUT(kk) '.txt'] ;
+    
+    RGB_range{kk} = textread(filename_LUT) ;
+    [ V_Min{kk}, V_Max{kk}, RGB_range{kk}] = Find_ColorValueRange( ...
+                    Mu{kk}, Sigma{kk}, Distr_Vals{kk} , RGB_range{kk}, vRange{kk});                
+end
+                       
+% Create ordered list of the clones (cs_All) and the end-of-line clone (cS_EndLine) 
+% This will allow to plot in the correct order, from the "latest" to the founder cell
+[cS_EndLine, cN_EndLine, cS_All] = fnc_Organize_cloneList(clone_List) ;
+
+% find the Max_CellLen, the number of segments the longest cell has
+if APP_opt.t3_PlotOpt_C <= 3 
+    [ Seg_Len, Max_CellLen ] = Find_NumberSegments(clone_List, max(ChNum), 1) ;
+elseif APP_opt.t3_PlotOpt_C >= 4 
+    [ Seg_Len, Max_CellLen ] = Find_NumberSegments(clone_List, max(ChNum), 2) ;
+end
+% Since the segmentation plot the "cell-line" is enlarged, we can easily
+% end having with overlapping data. Therefore, we take the 0.75%, which
+% will help to avoid overlap, especially of additional Extra Info and PoleID
+stp_Seg = (Dst_pl*0.75) / Max_CellLen ;
+
+
+% --- SAVE_step_0 ------ Initialize -------------------------------------
+if APP_opt.t3_choose_Save_txt == 1   
+    % Create a subfolder to store .txt files, if it does not exsist    
+    PathFolder = [APP_opt.t3_path_cloneList, '/Plotted_Values'];
+    if exist(PathFolder) == 0
+        mkdir(PathFolder) ;
+    end    
+    % Select appropriate file name for all Data.txt file to create
+    if isempty(APP_opt.t3_exp_name)
+        Path_txt = [ PathFolder ,'/'];
+    else
+        Path_txt = [ PathFolder ,'/', APP_opt.t3_exp_name, '_' ];
+    end
+    
+    % Initialize variable to collect all values of data plotted
+    % [cell array in which each element is a channel; for ratios we
+    %  collect their values and not individual channels]   
+    tree_Values= cell(4,length(clone_List));    
+
+    
+    % Find the latest time point for entire clone list, necessary to save data
+    % in .txt file by ensuring that each clone data has same length.
+    last_timepoint = -1 ;
+    for cc = 1 : size(clone_List,2)
+        if last_timepoint <= clone_List{cc}{1}.frame_last
+           last_timepoint = clone_List{cc}{1}.frame_last ;
+        end
+    end
+end
+
+
+
+
+if APP_opt.t3_PlotOpt_A == 1            % if GUI Plot Type: '1 - Lineage Tree'
+%% 
+% ***** PLOT LINEAGE TREE ************************************************************************
+
+% Make figure visible of invisible according to user's choice    
+if APP_opt.t3_choose_Display_Plot == 0
+    h1f = figure('Position', [100 300 1200 600], 'Visible','off'); 
+elseif APP_opt.t3_choose_Display_Plot == 1
+    h1f = figure('Position', [100 300 1200 600]);    
+end
+hold on;
+ax = gca; 
+LAST_Frm = 1;                           % highest value frame, use to find max x-axis length
+y_H_Row = [1:length(cN_EndLine)];   
+
+
+%% --- STEP 1 --- Plot all End_Line clones ---------------------------------
+% First we plot all end line clones, meaning all the clones that do not
+% generate daughter cells at the end of their "life".
+
+for cc = 1 : length(cN_EndLine)
+    % Find where the position of the cc-th EndLine in the array
+    idx_EndL = find(strcmp(cS_All , [APP_opt.t3_PlotOpt_NLineage cS_EndLine{cc}] ) == 1);
+    % Check if there are two cells with identical ID name
+    if length(idx_EndL)>2                           % if true, 
+        fprintf('ERROR, two identical cell IDs');   % ERROR and return
+        return
+    end        
+
+    % yrow = store the y position for plotting the current cc-th clone
+    yrow = y_H_Row(cc); 
+    
+    % Plot all time points. We use two counters for "time":
+    % - ff  = stores the array position of each element (/frame) of
+    %         the clone_List{XXX}: simply goes from 1 to last frame
+    % - Frm = x-axis "real" time variable, used to place the extracted
+    %         Value at the correct time point of the lineage tree
+    for ff = 1 : length(clone_List{idx_EndL})
+        
+        Frm = ff + clone_List{idx_EndL}{1}.frame_birth;
+        if Frm > LAST_Frm;     LAST_Frm = Frm;     end
+
+        % If choosen, plot HUD: cell poles orientation and cell_ID number
+        if ff == 1      % at frame of birth;
+           fnc_Plot_HUD( clone_List{idx_EndL}{1}, Frm, yrow, Dst_pl, hg_pl , LinW)
+        end
+                
+        % Define the coordinates of the "box" square polygon and find the
+        % signal value of the desired subcellular compartment to plot.
+        [Xs, Ys, Value] = Find_Value_XYSquare( clone_List{idx_EndL}{ff}, Frm, yrow, Dst_pl, stp_Seg, ChNum , SubLine, ...
+                                               APP_opt.t3_choose_ChannelMode, APP_opt.t3_PlotOpt_B, APP_opt.t3_PlotOpt_C, APP_opt.algorithm,  Seg_Len{idx_EndL}{ff} );
+       
+        % Transfor matrix of segments into a cell array, which is the format
+        % compatible with the function Assign_Value_RGB  
+        Value = mat2cell(Value{:}, 1, ones(1,length(Value{:})));
+        
+        % Now, evaluate the RGB_Color for each "Line" that we wish to plot for each clone
+        for rr = 1 : Seg_Len{idx_EndL}{ff}            
+            cRGB  = Assign_Value_RGB( Value{rr} , RGB_range{1} );
+            % Fill squares with evaluated RGB_Color
+            fill(Xs(rr,:), Ys(rr,:), [cRGB(1), cRGB(2), cRGB(3)], 'LineStyle', 'none');
+        end
+        
+        % --- Extra Info ---- Place dots over cell_line to represent cell's
+        % eccentricity value [greys scale: black = 0/circle; white = 1/ellipse)]
+        if APP_opt.t3_display_ExI == 1
+            eXs = [clone_List{idx_EndL}{ff}.mesh(:,1); flipud(clone_List{idx_EndL}{ff}.mesh(:,3))];
+            eYs = [clone_List{idx_EndL}{ff}.mesh(:,2); flipud(clone_List{idx_EndL}{ff}.mesh(:,4))];       
+            [la, sa] = Geom_My_fit_ellipse__v2( eXs, eYs );
+            % Calculate ellipse eccentricity (sa = short semi-axis; la = long semi-axis)
+            % Multipling by factor *0.9 restrict grey scale to a range 0:0.9 and 
+            % it avoids having "white" marker (which are hardly visible)
+            El_Ec = sqrt( 1 - (sa^2/la^2)) .*0.9 ;
+            % The ratio cannot be bigger than 1
+            if El_Ec > 0.9 ;      El_Ec = 0.9 ;     end
+            El_Ec_Col = [El_Ec El_Ec El_Ec] ;
+            % establish the Y-Position where to place the label
+            if APP_opt.t3_PlotOpt_C  == 1  ||   APP_opt.t3_PlotOpt_C  == 4 
+                Y_Position = (yrow*Dst_pl -hg_pl/3) ;
+            elseif APP_opt.t3_PlotOpt_C  == 3  ||   APP_opt.t3_PlotOpt_C  == 6
+                Y_Position = (yrow*Dst_pl +hg_pl/3) ;
+            elseif APP_opt.t3_PlotOpt_C  == 2  ||   APP_opt.t3_PlotOpt_C  == 5
+                Y_Position = Ys(end, 3) +hg_pl/3 ;
+            end
+            plot( Frm -0.5, Y_Position , '.', 'MarkerSize', 8, 'LineWidth', 0.2, 'Color', El_Ec_Col);
+        end
+                
+        % --- SAVE_step_1 ---- Collect plotted value of all end-of-line clones
+        if APP_opt.t3_choose_Save_txt == 1   
+            % Save the value(s) plotted
+            tree_Values{1, idx_EndL} = [tree_Values{1, idx_EndL} , {Value}];     
+            % [px] Cell axial-length       
+            tree_Values{2, idx_EndL} = [tree_Values{2, idx_EndL} , clone_List{idx_EndL}{ff}.geom.length] ;    
+            % [px] Cell area
+            tree_Values{3, idx_EndL} = [tree_Values{3, idx_EndL} , clone_List{idx_EndL}{ff}.geom.area] ;
+            % y-position in plot  
+            tree_Values{4, idx_EndL} = [tree_Values{4, idx_EndL} , Frm ] ;
+        end
+        
+        % Draw two horizontal lines that bound the plotted data for the clone-Line
+        plot( [Frm-1, Frm], Ys(1, 1:2), 'LineWidth', LinW, 'Color', Color_BorderLines);
+        plot( [Frm-1, Frm], Ys(end-1, 3:4), 'LineWidth', LinW, 'Color', Color_BorderLines);
+        if ff == 1
+            % Draw vertical line at the first frame, to enclose cell
+            plot( [Frm-1, Frm-1], [Ys(1, 1), Ys(end-1, 3)], 'LineWidth', LinW, 'Color', Color_BorderLines);
+        end
+
+    end % ff
+            
+    % Draw vertical line at the end, to enclose last time point
+    plot( [Frm, Frm], [Ys(1, 1), Ys(end-1, 3)], 'LineWidth', LinW, 'Color', Color_BorderLines);
+
+end % cc
+
+
+
+%% --- STEP 2 --- Plot all remaining clones ---------------------------------
+% This step will plot all the remaining clones. The algorithm find clone
+% couples using cS_EndLine: a couple is two clonse that share same ID root
+% (.XYZ ). From this it is possible to identify the common ancestror and
+% plot such cell (which would be .XY ). The cS_EndLine list is updated and
+% the algorithm proceed with the next couple, and so on until we end up to
+% the progenitor cell itself. 
+% [This must use while-loop to ensure we plot all clones]
+
+while length(cS_EndLine)>=2
+    % cc is the counter of the cell position in arrays, such as cS_EndLine and clone_List 
+    cc = 0 ; 
+    
+    while cc < length(cS_EndLine)
+        cc = cc+1;
+        
+        % Find the two twins: ID name string as well as index positionin array
+        % If a twin ID name end in 1, the other must be 2, and viceversa
+        TWstr_A = cS_EndLine{cc}(2:end);
+        if  TWstr_A(end) == '1'
+            TWstr_B = [cS_EndLine{cc}(2:end-1) '2'];
+        elseif  TWstr_A(end) == '2'
+            TWstr_B = [cS_EndLine{cc}(2:end-1) '1'];   
+        end
+        idx_TA =  find(strcmp(cS_EndLine, ['.' TWstr_A] ) == 1) ;
+        idx_TB =  find(strcmp(cS_EndLine, ['.' TWstr_B] ) == 1) ;
+        
+        % Plot the common ancestor
+        if ~isempty(idx_TA) && ~isempty(idx_TB)            
+            % Find ancestor ID name and postion in array
+            str_Anc = [APP_opt.t3_PlotOpt_NLineage '.' TWstr_A(1:end-1)] ;
+            idx_Anc = find(strcmp(cS_All , str_Anc ) == 1);            
+            % The last time point of the ancestor is the birth of the two twins
+            idx_birth = clone_List{idx_Anc}{1}.frame_last ;  
+            
+            % yrow = store the y position for plotting the current cc-th clone
+            yrow = (y_H_Row(idx_TA) + y_H_Row(idx_TB)) /2 ;
+
+            % Plot vertical line at idx_birth (cell divisions), connecting 
+            % two daughter cells (twins) in lineage tree
+            Xs = [ idx_birth+1 , idx_birth+1 ];
+            if y_H_Row(idx_TA) < y_H_Row(idx_TB)
+                Ys = [ y_H_Row(idx_TA)*Dst_pl,  (y_H_Row(idx_TB)*Dst_pl)+hg_pl];
+            elseif y_H_Row(idx_TA) > y_H_Row(idx_TB)
+                Ys = [ y_H_Row(idx_TB)*Dst_pl,  (y_H_Row(idx_TA)*Dst_pl)+hg_pl];
+            end
+            plot(Xs, Ys, '-', 'LineWidth', LinW, 'Color', Color_BorderLines); 
+
+            % Plot all time points. We use two counters for "time":
+            % - ff  = stores the array position of each element (/frame) of
+            %         the clone_List{XXX}: simply goes from 1 to last frame
+            % - Frm = x-axis "real" time variable, used to place the extracted
+            %         Value at the correct time point of the lineage tree
+            for ff = 1 : length(clone_List{idx_Anc})
+
+                Frm = ff + clone_List{idx_Anc}{1}.frame_birth;
+                if Frm > LAST_Frm;     LAST_Frm = Frm;     end
+
+                % If choosen, plot HUD: cell poles orientation and cell_ID number
+                if ff == 1      % at frame of birth;
+                   fnc_Plot_HUD( clone_List{idx_Anc}{1}, Frm, yrow, Dst_pl, hg_pl , LinW)
+                end
+
+                % Define the coordinates of the "box" square polygon and find the
+                % signal value of the desired subcellular compartment to plot.
+                [Xs, Ys, Value] = Find_Value_XYSquare( clone_List{idx_Anc}{ff}, Frm, yrow, Dst_pl, stp_Seg, ChNum , SubLine, ...
+                                                       APP_opt.t3_choose_ChannelMode, APP_opt.t3_PlotOpt_B, APP_opt.t3_PlotOpt_C, APP_opt.algorithm,  Seg_Len{idx_Anc}{ff} );
+
+                % Transfor matrix of segments into a cell array, which is the format
+                % compatible with the function Assign_Value_RGB  
+                Value = mat2cell(Value{:}, 1, ones(1,length(Value{:})));
+
+                % Now, evaluate the RGB_Color for each "Line" that we wish to plot for each clone
+                for rr = 1 : Seg_Len{idx_Anc}{ff}            
+                    cRGB  = Assign_Value_RGB( Value{rr} , RGB_range{1} );
+                    % Fill squares with evaluated RGB_Color
+                    fill(Xs(rr,:), Ys(rr,:), [cRGB(1), cRGB(2), cRGB(3)], 'LineStyle', 'none');
+                end
+
+                % --- Extra Info ---- Place dots over cell_line to represent cell's
+                % eccentricity value [greys scale: black = 0/circle; white = 1/ellipse)]
+                if APP_opt.t3_display_ExI == 1
+                    eXs = [clone_List{idx_Anc}{ff}.mesh(:,1); flipud(clone_List{idx_Anc}{ff}.mesh(:,3))];
+                    eYs = [clone_List{idx_Anc}{ff}.mesh(:,2); flipud(clone_List{idx_Anc}{ff}.mesh(:,4))];       
+                    [la, sa] = Geom_My_fit_ellipse__v2( eXs, eYs );
+                    % Calculate ellipse eccentricity (sa = short semi-axis; la = long semi-axis)
+                    % Multipling by factor *0.9 restrict grey scale to a range 0:0.9 and 
+                    % it avoids having "white" marker (which are hardly visible)
+                    El_Ec = sqrt( 1 - (sa^2/la^2)) .*0.9 ;
+                    % The ratio cannot be bigger than 1
+                    if El_Ec > 0.9 ;      El_Ec = 0.9 ;     end
+                    El_Ec_Col = [El_Ec El_Ec El_Ec] ;  
+                    if APP_opt.t3_PlotOpt_C  == 1  ||   APP_opt.t3_PlotOpt_C  == 4 
+                        Y_Position = (yrow*Dst_pl -hg_pl/3) ;
+                    elseif APP_opt.t3_PlotOpt_C  == 3  ||   APP_opt.t3_PlotOpt_C  == 6
+                        Y_Position = (yrow*Dst_pl +hg_pl/3) ;
+                    elseif APP_opt.t3_PlotOpt_C  == 2  ||   APP_opt.t3_PlotOpt_C  == 5
+                        Y_Position = Ys(end, 3) +hg_pl/3 ;
+                    end
+                    plot( Frm -0.5, Y_Position , '.', 'MarkerSize', 8, 'LineWidth', 0.2, 'Color', El_Ec_Col);
+                end
+
+                % --- SAVE_step_2 ---- Collect plotted value of all end-of-line clones
+                % Save the value(s) plotted
+                if APP_opt.t3_choose_Save_txt == 1   
+                    % Save the value(s) plotted
+                    tree_Values{1, idx_Anc} = [tree_Values{1, idx_Anc} , {Value}];     
+                    % [px] Cell axial-length       
+                    tree_Values{2, idx_Anc} = [tree_Values{2, idx_Anc} , clone_List{idx_Anc}{ff}.geom.length] ;    
+                    % [px] Cell area
+                    tree_Values{3, idx_Anc} = [tree_Values{3, idx_Anc} , clone_List{idx_Anc}{ff}.geom.area] ;
+                    % y-position in plot  
+                    tree_Values{4, idx_Anc} = [tree_Values{4, idx_Anc} ,  Frm ] ;
+                end
+
+                % Draw two horizontal lines that bound the plotted data for the clone-Line
+                plot( [Frm-1, Frm], Ys(1, 1:2), 'LineWidth', LinW, 'Color', Color_BorderLines);
+                plot( [Frm-1, Frm], Ys(end-1, 3:4), 'LineWidth', LinW, 'Color', Color_BorderLines);
+                if ff == 1
+                    % Draw vertical line at the first frame, to enclose cell
+                    plot( [Frm-1, Frm-1], [Ys(1, 1), Ys(end-1, 3)], 'LineWidth', LinW, 'Color', Color_BorderLines);
+                end
+
+            end % ff
+
+        % Draw vertical line at the end, to enclose last time point
+        plot( [Frm, Frm], [Ys(1, 1), Ys(end-1, 3)], 'LineWidth', LinW, 'Color', Color_BorderLines);
+
+        % UPDATE cS_EndLine ----------------------------------------
+        % Remove the ID of the couple we just plotted and...
+        % (we do not need to update cN_EndLine)
+        cS_EndLine{idx_TA} = '';
+        cS_EndLine{idx_TB} = '';
+        y_H_Row(idx_TA) = yrow;            
+        y_H_Row(idx_TB) = [];
+        % ... put their common ancestor ID_anc in the list, since now it is a "end-line"                  
+        [String] = strsplit(str_Anc, '.');
+        cS_EndLine{idx_TA} = [ '.' String{2} ];
+        % ... and we remove empty elements from the list
+        cS_EndLine = cS_EndLine(~cellfun(@isempty, cS_EndLine)) ;
+
+        end % if isempty
+        
+    end  % while cc
+    
+end % while length
+
+% Last idx_Anc is lineage progenitor: draw vertical line at the start, to enclose Plot_Line
+plot( [clone_List{idx_Anc}{1}.frame_birth , clone_List{idx_Anc}{1}.frame_birth],...
+      [yrow*Dst_pl , (yrow*Dst_pl)+hg_pl], 'LineWidth', LinW, 'Color', Color_BorderLines);
+
+
+  
+  
+  
+  
+
+elseif APP_opt.t3_PlotOpt_A == 2            % if GUI Plot Type: '2 - Individual Clones'
+%% 
+% ***** PLOT CLONES INDEPENDENTLY ****************************************************************
+
+% Make figure visible of invisible according to user choice   
+if APP_opt.t3_choose_Display_Plot == 0
+    h1f = figure('Position', [100 300 1200 600], 'Visible','off'); 
+elseif APP_opt.t3_choose_Display_Plot == 1
+    h1f = figure('Position', [100 300 1200 600]);    
+end
+hold on;       
+ax = gca; 
+% In independent clones plotting, there are as many as the number of clones
+y_H_Row = [1:length(clone_List)];
+   
+
+% ----- Plot all clones independently
+for cc = 1 : length(clone_List)    
+    % yrow = store the y position where the current cc-th cell is plotted
+    %        (in independent clone-plot this is just cc)
+    yrow = cc ;
+    
+    % ff = only one counter for "time", since we plot each clone starting 
+    % from x=0, array position and time (x-axis) coincides.
+    for ff = 1 : length(clone_List{cc})        
+        if ff > LAST_Frm;     LAST_Frm = ff;     end
+
+        % If choosen, plot HUD: cell poles orientation and cell_ID number
+        if ff == 1      % at frame of birth;
+           fnc_Plot_HUD( clone_List{cc}{1}, ff, yrow, Dst_pl, hg_pl , LinW)
+        end
+        
+        % Define the coordinates of the "box" square polygon and find the
+        % signal value of the desired subcellular compartment to plot.
+        [Xs, Ys, Value] = Find_Value_XYSquare( clone_List{cc}{ff}, ff, yrow, Dst_pl, stp_Seg, ChNum , SubLine, ...
+                                               APP_opt.t3_choose_ChannelMode, APP_opt.t3_PlotOpt_B, APP_opt.t3_PlotOpt_C, APP_opt.algorithm,  Seg_Len{cc}{ff} );
+
+        % Transfor matrix of segments into a cell array, which is the format
+        % compatible with the function Assign_Value_RGB  
+        Value = mat2cell(Value{:}, 1, ones(1,length(Value{:})));
+
+        % Now, evaluate the RGB_Color for each "Line" that we wish to plot for each clone
+        for rr = 1 : Seg_Len{cc}{ff}            
+            cRGB  = Assign_Value_RGB( Value{rr} , RGB_range{1} );
+            % Fill squares with evaluated RGB_Color
+            fill(Xs(rr,:), Ys(rr,:), [cRGB(1), cRGB(2), cRGB(3)], 'LineStyle', 'none');
+        end
+
+        % --- Extra Info ---- Place dots over cell_line to represent cell's
+        % eccentricity value  [greys scale: black = 0/circle; white = 1/ellipse)]
+        if APP_opt.t3_display_ExI == 1
+            eXs = [clone_List{cc}{ff}.mesh(:,1); flipud(clone_List{cc}{ff}.mesh(:,3))];
+            eYs = [clone_List{cc}{ff}.mesh(:,2); flipud(clone_List{cc}{ff}.mesh(:,4))];       
+            [la, sa] = Geom_My_fit_ellipse__v2( eXs, eYs );
+            % Calculate ellipse eccentricity (sa = short semi-axis; la = long semi-axis)
+            % Multipling by factor *0.9 restrict grey scale to a range 0:0.9 and 
+            % it avoids having "white" marker (which are hardly visible)
+            El_Ec = sqrt( 1 - (sa^2/la^2)) .*0.9 ;
+            % The ratio cannot be bigger than 1
+            if El_Ec > 0.9 ;      El_Ec = 0.9 ;     end
+            El_Ec_Col = [El_Ec El_Ec El_Ec] ;  
+            % establish the Y-Position where to place the label
+            if APP_opt.t3_PlotOpt_C  == 1  ||   APP_opt.t3_PlotOpt_C  == 4 
+                Y_Position = (yrow*Dst_pl -hg_pl/3) ;
+            elseif APP_opt.t3_PlotOpt_C  == 3  ||   APP_opt.t3_PlotOpt_C  == 6
+                Y_Position = (yrow*Dst_pl +hg_pl/3) ;
+            elseif APP_opt.t3_PlotOpt_C  == 2  ||   APP_opt.t3_PlotOpt_C  == 5
+                Y_Position = Ys(end, 3) +hg_pl/3 ;
+            end
+            plot( ff -0.5, Y_Position , '.', 'MarkerSize', 8, 'LineWidth', 0.2, 'Color', El_Ec_Col);
+        end
+        
+        % --- SAVE_step_1-2 ---- Collect plotted value of all clones        
+        % Save the value(s) plotted
+        if APP_opt.t3_choose_Save_txt == 1   
+            % Save the value(s) plotted
+            tree_Values{1, cc} = [tree_Values{1, cc} , {Value}];     
+            % [px] Cell axial-length       
+            tree_Values{2, cc} = [tree_Values{2, cc} , clone_List{cc}{ff}.geom.length] ;    
+            % [px] Cell area
+            tree_Values{3, cc} = [tree_Values{3, cc} , clone_List{cc}{ff}.geom.area] ;
+            % y-position in plot  
+            tree_Values{4, cc} = [tree_Values{4, cc} ,  ff ] ;
+        end
+                    
+        % Draw two horizontal lines that bound the plotted data for the clone-Line
+        plot( [ff-1, ff], Ys(1, 1:2), 'LineWidth', LinW, 'Color', Color_BorderLines);
+        plot( [ff-1, ff], Ys(end-1, 3:4), 'LineWidth', LinW, 'Color', Color_BorderLines);
+        if ff == 1
+            % Draw vertical line at the first frame, to enclose cell
+            plot( [ff-1, ff-1], [Ys(1, 1), Ys(end-1, 3)], 'LineWidth', LinW, 'Color', Color_BorderLines);
+        end
+        
+    end % ff     
+
+    % Draw vertical line at the END, to enclose all end_Lines
+    plot( [ff, ff], [Ys(1, 1), Ys(end-1, 3)], 'LineWidth', LinW, 'Color', Color_BorderLines);
+    
+end % cc
+
+end % if Plot
+
+
+
+
+
+%% *** SAVE the FIGURE and DATA *******************************************
+
+% --- FINISH layout and SAVE Plot -----------------------------------------
+h1f.Color = [1 1 1];
+ax.TickDir = 'out';                 ax.YTick = [] ;                 
+ax.XColor = Color_BorderLines ;     ax.YColor = 'none' ;
+ax.LineWidth = LinW ;               ax.FontSize = 15 ;
+% Create extra space at end of x axis, where place colorbar legends (simply extending of  MaxX+Delta_X)
+XTicksPos = linspace(ax.XLim(1), ax.XLim(2), length(ax.XTick)) ./ fpmRate ;
+XTicksPos = [XTicksPos , XTicksPos(end)+(XTicksPos(end)-XTicksPos(end-1))];
+ax.XLim(2)     = ax.XTick(end) + ( ax.XTick(end)-ax.XTick(end-1)) ;
+ax.XTickLabel  = XTicksPos ;
+
+
+% ---> PLOT colorbars (for all channels)
+for kk = SubLine
+    % Use correct label for the colorbar legends
+    if APP_opt.t3_choose_ChannelMode <= 3
+        barLabel = ['Channel ' num2str(ChNum(kk))] ; 
+    elseif APP_opt.t3_choose_ChannelMode == 4
+        barLabel = 'Ratio 1-2' ;
+    elseif APP_opt.t3_choose_ChannelMode == 5
+        barLabel = 'Ratio 2-1' ;
+    end
+    
+    % To show two separate colorbar legends, we need create second x-axis.
+    % Colormap associate legend to one axis only, and if run it twice it
+    % simply overwrite and not creating a second one.
+    switch kk
+        case 1
+            barAX = ax ;            
+        case 2
+            ax1_pos = ax.Position;                  
+            barAX = axes('Position', ax1_pos, 'XAxisLocation','top', 'YAxisLocation','right', 'Color','none');
+            barAX.YTick = [] ;                barAX.YColor = 'none';
+            barAX.XTick = [] ;                barAX.XColor = 'none';            
+    end    
+    TickPos = linspace(0,1,7);
+    ValuePos = floor(size(RGB_range{kk},1) .* TickPos) ;
+    ValuePos(ValuePos == 0) = 1;
+    ValuePos = RGB_range{kk}(ValuePos,4) ;
+    
+    % Choose a readable number format for the legends
+    StrBar = {};
+    for vv = 1 : size(ValuePos,1)
+        if ValuePos(vv) < 1000             
+            StrBar{vv} = num2str(ValuePos(vv), '%.2f') ;
+        else
+            StrBar{vv} = num2str(ValuePos(vv), '%3.2e') ;
+        end
+    end
+    % Plot the colorbar, adjust the position and size. Channel 1 is the
+    % lower one (if there are twwo channels, 2 is positioned above the 1)
+    m  = colormap(barAX, RGB_range{kk}(:,1:3) ./255);
+    cp = colorbar(barAX, 'FontSize', 12 , 'Ticks',TickPos, 'TickLabels', StrBar );
+    cp.Location     = 'eastoutside';
+    cp.Label.String = barLabel;
+    cp.Position(1)  = 0.85;
+    cp.Position(2)  = ((kk-1)*0.4) + cp.Position(2) + cp.Position(3)*2;
+    cp.Position(4)  = cp.Position(4)*0.4;    
+    cp.LineWidth    = LinW;
+    cp.Color        = Color_BorderLines ;
+end
+% Render the picture, improving quality of .tif images and vectorial .pdf
+h1f.Renderer = 'Painters';
+
+
+% Select appropriate filename ending according to analysis performed
+terminator = [num2str(APP_opt.t3_PlotOpt_A) '_' num2str(APP_opt.t3_PlotOpt_B) '_' num2str(APP_opt.t3_PlotOpt_C)];
+if APP_opt.t3_choose_AutoSave_Plot ~= 0
+    if isempty(APP_opt.t3_exp_name)
+        filename_plot = [ APP_opt.t3_path_cloneList ,'/', 'Plot_' terminator ];
+    else
+        filename_plot = [ APP_opt.t3_path_cloneList ,'/' , APP_opt.t3_exp_name , '_', 'Plot_' terminator ];
+    end
+    if     APP_opt.t3_choose_AutoSave_Plot == 1;       print(h1f, filename_plot ,'-dpdf');
+    elseif APP_opt.t3_choose_AutoSave_Plot == 2;       print(h1f, filename_plot , '-r300', '-dtiffn');
+    elseif APP_opt.t3_choose_AutoSave_Plot == 3;       print(h1f, filename_plot ,'-dsvg');
+    end
+end
+
+
+
+% --- SAVE_step_3 ---- Save Plotted data in a .txt file -----------------
+if APP_opt.t3_choose_Save_txt == 1 
+   
+    % We save all data in a single file
+    if APP_opt.t3_choose_ChannelMode <= 2
+        FileTag = ['CH' num2str(ChNum(kk))] ; 
+    elseif APP_opt.t3_choose_ChannelMode == 4
+        FileTag = 'R1-2' ;
+    elseif APP_opt.t3_choose_ChannelMode == 5
+        FileTag = 'R2-1' ;
+    end
+    file_S = fopen([Path_txt 'Data_Segment_', FileTag , '_' terminator '.txt' ], 'w+');     
+    fprintf( file_S , 'Clone ID\tTime Birth\tFrame-to-Min\tFrame\tCell_Legnth\tCellArea\t' );           
+    fprintf( file_S , '%f\t', [1 : Max_CellLen]' );
+    fprintf( file_S , '\n' );
+
+    % Reorganize data to have all have same "length" and data at the correct "column" position.
+    for cc = 1 : size(clone_List,2)
+        for ff = 1 : size(clone_List{1,cc},2)
+            fprintf( file_S , '%s\t', clone_List{cc}{1}.ID_clone );
+            fprintf( file_S , '%f\t', clone_List{cc}{1}.frame_birth );
+            fprintf( file_S , '%f\t', 1/ fpmRate );
+            fprintf( file_S , '%f\t', tree_Values{4,cc}(ff) );        
+            fprintf( file_S , '%f\t', tree_Values{2,cc}(ff) );
+            fprintf( file_S , '%f\t', tree_Values{3,cc}(ff) );   
+            
+            % Create the line with segmentation values, adding -1 before and
+            % after to fill a Line and ensure that they all the same length
+            Val =  cell2mat(tree_Values{1,cc}{1,ff}) ;                   
+            Z = Max_CellLen - length(Val);
+            if mod(Z,2) == 0
+                plus = ones(1, (Z/2))*(-1);
+                aLine = [plus, Val , plus];
+            else
+                plus = ones(1, fix(Z/2))*(-1);      % fix(), division returning integer
+                aLine = [plus, Val , plus, -1];
+            end
+            fprintf( file_S , '%f\t', aLine );
+            fprintf( file_S , '\n' );
+            
+        end %ff
+    end %cc
+
+    fclose(file_S) ;
+    
+end % Save .txt
+
+end % MAIN fnc
