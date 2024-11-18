@@ -77,35 +77,35 @@ To summarize, the output file created are the following:
 | ![Figure 4](Guide_Figures/Memb_2_Cyto/M2C_1.png) | The cell outline identified in the bright field image is used as a mask to isolate the fluorescence signal of the specific cell. A cropped image of the cell of interest is generated and used for all subsequent calculations. |
 | ![Figure 5](Guide_Figures/Memb_2_Cyto/M2C_2.png) | The perimeter of a cell is converted in a set of pixel coordinates (yellow points). The cell longitudinal axis of a cell and the area are some of parameters calculated. |
 | ![Figure 6](Guide_Figures/Memb_2_Cyto/M2C_3.png) | The next step involves identification of signal clusters (foci) using Signal threshold and Foci size as criteria. For each of those clusters a mask is generated and stored. Later each mask can be used to calculate the average signal intensity, areas, etc… |
-| <img src="Guide_Figures/Memb_2_Cyto/M2C_41.png" width="45%"> <img src="Guide_Figures/Memb_2_Cyto/M2C_42.png" width="45%"> | The algorithm then identifies the membrane (right picture) and cytosol area (left picture).
-The program generate masks that define the two areas. Those mask are then used to calculate the fluorescent signal in each specific compartment The Membrane size is the main parameter that defines the extent of those areas. |
+| <img src="Guide_Figures/Memb_2_Cyto/M2C_41.png" width="49%"> <img src="Guide_Figures/Memb_2_Cyto/M2C_42.png" width="49%"> | The algorithm then identifies the membrane (right picture) and cytosol area (left picture. The program generate masks that define the two areas. Those mask are then used to calculate the fluorescent signal in each specific compartment The Membrane size is the main parameter that defines the extent of those areas. |
 | ![Figure 9](Guide_Figures/Memb_2_Cyto/M2C_5.png) | For each foci a profile line (in green) is created. This line runs through the center of the foci and is orthogonal to the cell axis. The profile line is an array of pixel values for the fluorescent signal where the line passed. This create signal profile at those position that can be plotted. |
 
 ##### Algorithm steps **Polar_Sig**
 | **Figure** | **Description** |	
 | --- | --- |
 | ![Figure 10](Guide_Figures/Polar_Sig/PS_1.png) | The cell outline identified during detection is superimposed to the fluorescence channel. The cell coordinates are divided in two side (yellow and red points). The blue line is the cell axis |
-| --- |
-| <img src="Guide_Figures/Polar_Sig/PS_21.png" width="45%"> <img src="Guide_Figures/Polar_Sig/PS_22.png" width="45%"> | At the extremities of each pole a circle is drawn (in black, right picture). This is then used to isolate each pole and in each area the algorithm search the pixel with the highest intensity value (left picture). |
-| --- |
-| <img src="Guide_Figures/Polar_Sig/PS_31.png" width="45%"> <img src="Guide_Figures/Polar_Sig/PS_32.png" width="45%"> | From the highest intensity value a smaller circular area is drawn and will define the mask for each pole. The picture on the left shows the two polar mask (magenta and rec) together, and in yellow the cell outline is represented. In the picture on the left is shown the mask for the cytosol, minus the poles. |
-| --- |
+| <img src="Guide_Figures/Polar_Sig/PS_21.png" width="49%"> <img src="Guide_Figures/Polar_Sig/PS_22.png" width="49%"> | At the extremities of each pole a circle is drawn (in black, right picture). This is then used to isolate each pole and in each area the algorithm search the pixel with the highest intensity value (left picture). |
+| <img src="Guide_Figures/Polar_Sig/PS_31.png" width="49%"> <img src="Guide_Figures/Polar_Sig/PS_32.png" width="49%"> | From the highest intensity value a smaller circular area is drawn and will define the mask for each pole. The picture on the left shows the two polar mask (magenta and rec) together, and in yellow the cell outline is represented. In the picture on the left is shown the mask for the cytosol, minus the poles. |
 
 
 ### 2 - Lineage and Lineage Plot
-The ***Lineage*** function tab is very similar to the “Independent Frames” tab (see [Figure 3](Guide_Figures/Tab_3.png)). Algorithm, parameters and options for the most part are shared. There are two differences: the algorithm works in a single step (the “Lineage” function itself is just one script) and it requires as input an additional file containing the tracking of cells. This file is a list of tracks, where each track is a set of xy-coordinates of the position of a given cell in all the frames it appears in a time lapse. Fior example, this file can be created manually by the user, i.e. using the *mTrack* plugin of <u>**ImageJ**</u>.
+The ***Lineage*** function tab is very similar to the “Independent Frames” tab (see [Figure 3](Guide_Figures/Tab_3.png)).
 
 | ![Figure 15](Guide_Figures/Tab_3.png) 
 | --- |
 | The tab GUI for the “Lineage” tab. The above described parameters and options applies here as well. |
+
+
+Algorithm, parameters and options for the most part are shared. There are two differences: the algorithm works in a single step (the “Lineage” function itself is just one script) and it requires as input an additional file containing the tracking of cells. This file is a list of tracks, where each track is a set of xy-coordinates of the position of a given cell in all the frames it appears in a time lapse. Fior example, this file can be created manually by the user, i.e. using the *mTrack* plugin of <u>**ImageJ**</u>.
 
 Provided the inputs parameters, the list of tracks and *Detection.mat* the program can start analysis and at in the end provides a single result file. This is a list where each entry is a <u>***cell lineage***</u>, the results of the analysis on fluorescence as well as organizing cells and their relationships to each others through time.
 
 | ![Figure 16](Guide_Figures/Lineage.png) 
 | --- |
 | An example of a cell lineage plot. |
-
-
+ 
+  
+ 
 | ![Figure 17](Guide_Figures/Lineage_MotherDev.png) 
 | --- |
 | Another example of analysis of florescent change in cell lineages within the mother-cell microfluidic device. |
