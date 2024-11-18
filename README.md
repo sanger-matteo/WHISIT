@@ -1,12 +1,12 @@
 # WHISIT
 
 ## Purpose
-***WHISIT*** (WHere IS IT) is a Matlab-based program developed to identify bacteria and measures the fluorescent signal in different compartments. It can do this on a set of independent microscopy pictures, or on a movie and trcking cells to follow the signal through multiple generations and cell-lines.
+***WHISIT*** (WHere IS IT) is a Matlab-based program developed to identify bacteria and measures the fluorescent signal in different compartments. It can do this on a set of independent microscopy pictures, or on a movie and tracking cells to follow the signal through multiple generations and cell-lines.
 
 ### Background
 There are several programs for the analysis of foci and count numbers of spots in bacterial cells. However, few addresses how signal is distributed inside bacterial cells using a high-throughput and quantitative approach. For this reason the program WHISIT was created: for high-throughput quantification of fluorescent signal, specifically in into different areas of cells (e.g., membrane, cytosolic and polar compartments), rather than simply giving the average intensity value (as it is done by most software). Lastly, WHISIT can plot the fluorescence signal of related cells tracked in time lapse as a lineage tree, allowing for quantifying intergenerational changes. 
 
-In the following guide, we will explain how the program works and how to use it. WHISIT was created to be easy to use and no knowledge of programming is required, since it works with a graphic user interface (GUI). Results are created in a user friendly format accessible via Excel or any other similar spread-sheet program. In the last section, we will illustrate an outlook for the program and future improvements.
+In the following guide, we will explain how the program works and how to use it. WHISIT was created to be easy to use and no knowledge of programming is required, since it works with a graphic user interface (GUI). Results are created in a user friendly format accessible via Excel or any other similar spread-sheet program. improvements.
 
 | ![Figure 1](Guide_Figures/WHISIT_GUI.png) 
 | --- |
