@@ -73,21 +73,17 @@ To summarize, the output file created are the following:
 
 ##### Algorithm steps **Memb_to_Cyto** 
 | **Figure** | **Description** |	
-| --- |
+| --- | --- |
 | ![Figure 4](Guide_Figures/Memb_2_Cyto/M2C_1.png) | The cell outline identified in the bright field image is used as a mask to isolate the fluorescence signal of the specific cell. A cropped image of the cell of interest is generated and used for all subsequent calculations. |
-| --- |
 | ![Figure 5](Guide_Figures/Memb_2_Cyto/M2C_2.png) | The perimeter of a cell is converted in a set of pixel coordinates (yellow points). The cell longitudinal axis of a cell and the area are some of parameters calculated. |
-| --- |
 | ![Figure 6](Guide_Figures/Memb_2_Cyto/M2C_3.png) | The next step involves identification of signal clusters (foci) using Signal threshold and Foci size as criteria. For each of those clusters a mask is generated and stored. Later each mask can be used to calculate the average signal intensity, areas, etc… |
-| --- |
 | ![Figure 7](Guide_Figures/Memb_2_Cyto/M2C_41.png) ![Figure 8](Guide_Figures/Memb_2_Cyto/M2C_42.png) | The algorithm then identifies the membrane (right picture) and cytosol area (left picture).
 The program generate masks that define the two areas. Those mask are then used to calculate the fluorescent signal in each specific compartment The Membrane size is the main parameter that defines the extent of those areas. |
-| --- |
 | ![Figure 9](Guide_Figures/Memb_2_Cyto/M2C_5.png) | For each foci a profile line (in green) is created. This line runs through the center of the foci and is orthogonal to the cell axis. The profile line is an array of pixel values for the fluorescent signal where the line passed. This create signal profile at those position that can be plotted. |
 
 ##### Algorithm steps **Polar_Sig**
 | **Figure** | **Description** |	
-| --- |
+| --- | --- |
 | ![Figure 10](Guide_Figures/Polar_Sig/PS_1.png) | The cell outline identified during detection is superimposed to the fluorescence channel. The cell coordinates are divided in two side (yellow and red points). The blue line is the cell axis |
 | --- |
 | ![Figure 11](Guide_Figures/Polar_Sig/PS_21.png) ![Figure 12](Guide_Figures/Polar_Sig/PS_22.png)  | At the extremities of each pole a circle is drawn (in black, right picture). This is then used to isolate each pole and in each area the algorithm search the pixel with the highest intensity value (left picture). |
