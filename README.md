@@ -3,7 +3,7 @@
 ## Purpose
 ***WHISIT*** (WHere IS IT) is a Matlab-based program developed to identify bacteria and measures the fluorescent signal in different compartments. It can do this on a set of independent microscopy pictures, or on a movie and trcking cells to follow the signal through multiple generations and cell-lines.
 
-#### Background
+### Background
 There are several programs for the analysis of foci and count numbers of spots in bacterial cells. However, few addresses how signal is distributed inside bacterial cells using a high-throughput and quantitative approach. For this reason the program WHISIT was created: for high-throughput quantification of fluorescent signal, specifically in into different areas of cells (e.g., membrane, cytosolic and polar compartments), rather than simply giving the average intensity value (as it is done by most software). Lastly, WHISIT can plot the fluorescence signal of related cells tracked in time lapse as a lineage tree, allowing for quantifying intergenerational changes. 
 
 In the following guide, we will explain how the program works and how to use it. WHISIT was created to be easy to use and no knowledge of programming is required, since it works with a graphic user interface (GUI). Results are created in a user friendly format accessible via Excel or any other similar spread-sheet program. In the last section, we will illustrate an outlook for the program and future improvements.
@@ -32,14 +32,14 @@ A stack of bright field images is given as input in “Independent frames” ana
 
 
 
-### 1 - Independent Frames Analysis - How to use it 
+## 1 - Independent Frames Analysis - How to use it 
 In the Algorithm panel, several parameters can be chosen. The first it is to choose which algorithm to use to analyse the images: ***Memb_to_Cyto***, which analyses the distribution of fluorescent in cytosol and membrane; or ***Polar_Sign***, which analyses the distribution of fluorescent specfically at the poles of cells. 
 
 | ![Figure 2](Guide_Figures/Algorithms.png) 
 | --- |
 | <u>Figure 2</u> – A schematic representation of the main steps that the program used to create masks for the different cell compartments. In (A) is shown the algorithm **Memb_2_Cyto**, while in (B) is shown the algorithm **Polar_Sig**. |
 
-#### Parameters for analysis
+### Parameters for analysis
 Several parameters are available to tune the analysis.
 - The algorithm ***Memb_to_Cyto*** divides the interior of cells in two compartments for analysis (see [Figure 2](Guide_Figures/Algorithms.png)). The “membrane area” extend inward from the perimeter of a cell, with a specific thickness (Membrane size). The remaining area is defined as “cytosol area”. This algorithm also identifies clusters of signals that are used to make a cross-section of cells and saves the signal profile at this specific positions. Two editable parameters allow for choosing the criteria for selection of clusters of signal. 
 NOTE: We named these signal clustering “foci” for simplicity, but we do not use the word “foci” in the classical definition, as round spot of signals. Here with “foci” we are considering a clusters of signal above a specific signal threshold level. Since the shape is not important, so they may have any shape.
@@ -58,7 +58,7 @@ NOTE: We named these signal clustering “foci” for simplicity, but we do not 
 	- **BOX BORDER**: when analysing fluorescence images, a cropped image of each cell is create and stored in the results. The data created is therefore not only a database of numbers, but also contains all the images related to each cell. This value determines the extra border to add to a cropped image of single cells. It does not change analysis results, but should be at least >10 pixels. NOTE: if a cell is located close to the border of a frame, there can be error in analysis. It is recommended to exclude cells during cell detection in MicrobeTracker or Oufti, which are closer than the box border distance.
 
 
-#### Algorithm steps – quick overview
+### Algorithm steps – quick overview
 The main algorithm proceed in three separate steps that run as follow:
 1. **RETRIEVE CELLS**: retrieves the cells detected from the analysis file *Detection.mat*. Data is reorganized in a new format and named *ExpN_1_DB.mat*. This file is necessary for the next step (Analysis) and has no back compatability with MicrobeTracker or Oufti.
 2. **ANALYSE**: initiates analysis of the fluorescent signal using the algorithm and parameters selected. *ExpN_1_DB.mat* file and stack of images (bright field, channel 1 and channel 2) are provided as inputs. *ExpN_1_DB.mat* remain unchanged and a new output file *ExpN_2_DB.mat* is created.
@@ -71,7 +71,7 @@ To summarize, the output file created are the following:
 - *ExpN_txt*: this is a report file that can be opened with Excel and easily performs statistics and draws chats of the results. For more details on the data structure see the Output File Format section. The algorithm **Memb_2_Cyto** generates <u>two</u> of such files, while the algorithm **Polar_Sign** generate only <u>one</u> file.
 	- NOTE: *ExpN* can be any name assigned in the **field E** [Figure 1](Guide_Figures/WHISIT_GUI.png). The STOP button can be used at any point during second step “Analyse”. If it is pressed it will interrupt the analysis. However, data analysed will be lost. If you push START, it starts all over from the first cell. Data is saved only at the end of the step analysis.
 
-##### Algorithm steps **Memb_to_Cyto** 
+#### Algorithm steps **Memb_to_Cyto** 
 | **Figure** | **Description** |	
 | --- | --- |
 | ![Figure 4](Guide_Figures/Memb_2_Cyto/M2C_1.png) | The cell outline identified in the bright field image is used as a mask to isolate the fluorescence signal of the specific cell. A cropped image of the cell of interest is generated and used for all subsequent calculations. |
@@ -80,7 +80,7 @@ To summarize, the output file created are the following:
 | <img src="Guide_Figures/Memb_2_Cyto/M2C_41.png" width="45%"> <img src="Guide_Figures/Memb_2_Cyto/M2C_42.png" width="45%"> | The algorithm then identifies the membrane (right picture) and cytosol area (left picture. The program generate masks that define the two areas. Those mask are then used to calculate the fluorescent signal in each specific compartment The Membrane size is the main parameter that defines the extent of those areas. |
 | ![Figure 9](Guide_Figures/Memb_2_Cyto/M2C_5.png) | For each foci a profile line (in green) is created. This line runs through the center of the foci and is orthogonal to the cell axis. The profile line is an array of pixel values for the fluorescent signal where the line passed. This create signal profile at those position that can be plotted. |
 
-##### Algorithm steps **Polar_Sig**
+#### Algorithm steps **Polar_Sig**
 | **Figure** | **Description** |	
 | --- | --- |
 | ![Figure 10](Guide_Figures/Polar_Sig/PS_1.png) | The cell outline identified during detection is superimposed to the fluorescence channel. The cell coordinates are divided in two side (yellow and red points). The blue line is the cell axis |
@@ -88,7 +88,7 @@ To summarize, the output file created are the following:
 | <img src="Guide_Figures/Polar_Sig/PS_31.png" width="45%"> <img src="Guide_Figures/Polar_Sig/PS_32.png" width="45%"> | From the highest intensity value a smaller circular area is drawn and will define the mask for each pole. The picture on the left shows the two polar mask (magenta and rec) together, and in yellow the cell outline is represented. In the picture on the left is shown the mask for the cytosol, minus the poles. |
 
 
-### 2 - Lineage and Lineage Plot
+## 2 - Lineage and Lineage Plot
 The ***Lineage*** function tab is very similar to the “Independent Frames” tab (see [Figure 3](Guide_Figures/Tab_3.png)).
 
 | ![Figure 15](Guide_Figures/Tab_3.png) 
